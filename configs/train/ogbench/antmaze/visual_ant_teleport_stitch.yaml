@@ -1,0 +1,35 @@
+env_type: 'OGBenchEnv'
+ogbench_env_type: 'AntMaze'
+ogbench_task_name: 'visual-antmaze-teleport-stitch-v0'
+save_dir: './results/OGBenchEnv_Ant_Maze/'
+
+# observation type
+obs_type: 'image'
+
+# data collection
+load_offline_dataset: True
+sampling_discount: 0.6
+
+# training configuration
+train: True
+test: False
+use_wandb: True
+
+dynamics_num_layers: 2
+multistep_horizon: 5
+prior_num_layers: 2
+batch_size: 256
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  seed: [0, 1, 2, 3]
+
+  # training steps sweep
+  allo_training_steps: [500000]
+  dynamics_training_steps: [500000]
+  prior_training_steps: [500000]
+  checkpoint_fractions: [[0.6, 0.8, 1.0]]

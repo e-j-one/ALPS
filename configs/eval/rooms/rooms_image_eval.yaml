@@ -1,0 +1,51 @@
+env_type: 'RoomEnv'
+save_dir: './results/RoomsEnv/'
+
+# observation type
+obs_type: 'image'
+
+# data collection
+buffer_size: 500000
+sampling_discount: 0.2
+
+# training configuration
+train: False
+test: True
+
+dynamics_hidden_dim: 128
+dynamics_num_layers: 2
+multistep_horizon: 3
+prior_max_horizon: 3
+prior_hidden_dim: 128
+prior_num_layers: 2
+batch_size: 128
+
+# visualization
+render: True
+show_graph: True
+
+# evaluation
+get_success_rate: True
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  rooms_env_name: ["rooms", "hallway", "spiral"]
+  seed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+  # training steps sweep
+  allo_training_steps: [100000]
+  dynamics_training_steps: [200000]
+  prior_training_steps: [0]
+
+  # eval sweep
+  num_clusters: [16]
+  use_prior_warmstart: [False]
+  horizon: [2]
+  samples: [200]
+  momentum: [0.0]
+  sigma: [0.2]
+  noise_beta: [0.1]

@@ -1,0 +1,38 @@
+env_type: 'OGBenchEnv'
+ogbench_env_type: 'HumanoidMaze'
+ogbench_task_name: 'humanoidmaze-medium-stitch-v0'
+save_dir: './results/OGBenchEnv_Humanoid_Maze/'
+
+# data collection
+load_offline_dataset: True
+sampling_discount: 0.6
+
+# training configuration
+train: False
+test: True
+
+# visualization
+render: True
+show_graph: True
+
+# evaluation
+get_success_rate: True
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  seed: [0, 1, 2, 3, 4, 5, 6, 7]
+
+  # training steps sweep
+  allo_training_steps: [1000000]
+  dynamics_training_steps: [1000000]
+  prior_training_steps: [1000000]
+  checkpoint_fractions: [[0.8, 0.9, 1.0]]
+
+  # eval sweep
+  num_clusters: [64]
+  use_planner: [True]
+  eval_checkpoint: [80, 90, 100]

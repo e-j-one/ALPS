@@ -1,0 +1,558 @@
+{
+  "env_name": "spiral",
+  "env_type": "RoomEnv",
+  "num_tasks": 50,
+  "generation_seed": 14,
+  "tasks": [
+    {
+      "task_id": 0,
+      "start_position": [
+        0.82,
+        0.36
+      ],
+      "goal_position": [
+        0.7,
+        0.85
+      ]
+    },
+    {
+      "task_id": 1,
+      "start_position": [
+        0.64,
+        0.55
+      ],
+      "goal_position": [
+        0.47,
+        0.57
+      ]
+    },
+    {
+      "task_id": 2,
+      "start_position": [
+        0.64,
+        0.73
+      ],
+      "goal_position": [
+        0.4,
+        0.51
+      ]
+    },
+    {
+      "task_id": 3,
+      "start_position": [
+        0.96,
+        0.3
+      ],
+      "goal_position": [
+        0.46,
+        0.88
+      ]
+    },
+    {
+      "task_id": 4,
+      "start_position": [
+        0.55,
+        0.42
+      ],
+      "goal_position": [
+        0.66,
+        0.04
+      ]
+    },
+    {
+      "task_id": 5,
+      "start_position": [
+        0.16,
+        0.86
+      ],
+      "goal_position": [
+        0.17,
+        0.04
+      ]
+    },
+    {
+      "task_id": 6,
+      "start_position": [
+        0.92,
+        0.75
+      ],
+      "goal_position": [
+        0.97,
+        0.75
+      ]
+    },
+    {
+      "task_id": 7,
+      "start_position": [
+        0.91,
+        0.35
+      ],
+      "goal_position": [
+        0.82,
+        0.73
+      ]
+    },
+    {
+      "task_id": 8,
+      "start_position": [
+        0.2,
+        0.19
+      ],
+      "goal_position": [
+        0.18,
+        0.81
+      ]
+    },
+    {
+      "task_id": 9,
+      "start_position": [
+        0.66,
+        0.29
+      ],
+      "goal_position": [
+        0.65,
+        0.68
+      ]
+    },
+    {
+      "task_id": 10,
+      "start_position": [
+        0.69,
+        0.99
+      ],
+      "goal_position": [
+        0.84,
+        0.43
+      ]
+    },
+    {
+      "task_id": 11,
+      "start_position": [
+        0.06,
+        0.23
+      ],
+      "goal_position": [
+        0.08,
+        0.78
+      ]
+    },
+    {
+      "task_id": 12,
+      "start_position": [
+        0.79,
+        0.22
+      ],
+      "goal_position": [
+        0.94,
+        0.33
+      ]
+    },
+    {
+      "task_id": 13,
+      "start_position": [
+        0.47,
+        0.58
+      ],
+      "goal_position": [
+        0.99,
+        0.89
+      ]
+    },
+    {
+      "task_id": 14,
+      "start_position": [
+        0.15,
+        0.89
+      ],
+      "goal_position": [
+        0.21,
+        0.8
+      ]
+    },
+    {
+      "task_id": 15,
+      "start_position": [
+        0.67,
+        0.16
+      ],
+      "goal_position": [
+        0.06,
+        0.92
+      ]
+    },
+    {
+      "task_id": 16,
+      "start_position": [
+        0.01,
+        0.15
+      ],
+      "goal_position": [
+        0.97,
+        0.69
+      ]
+    },
+    {
+      "task_id": 17,
+      "start_position": [
+        0.56,
+        0.45
+      ],
+      "goal_position": [
+        0.57,
+        0.46
+      ]
+    },
+    {
+      "task_id": 18,
+      "start_position": [
+        0.07,
+        0.24
+      ],
+      "goal_position": [
+        0.32,
+        0.5
+      ]
+    },
+    {
+      "task_id": 19,
+      "start_position": [
+        0.4,
+        0.72
+      ],
+      "goal_position": [
+        0.8,
+        0.76
+      ]
+    },
+    {
+      "task_id": 20,
+      "start_position": [
+        0.46,
+        0.39
+      ],
+      "goal_position": [
+        0.03,
+        0.36
+      ]
+    },
+    {
+      "task_id": 21,
+      "start_position": [
+        0.78,
+        0.35
+      ],
+      "goal_position": [
+        0.29,
+        0.17
+      ]
+    },
+    {
+      "task_id": 22,
+      "start_position": [
+        0.63,
+        0.5
+      ],
+      "goal_position": [
+        0.06,
+        0.25
+      ]
+    },
+    {
+      "task_id": 23,
+      "start_position": [
+        0.09,
+        0.16
+      ],
+      "goal_position": [
+        0.98,
+        0.63
+      ]
+    },
+    {
+      "task_id": 24,
+      "start_position": [
+        0.13,
+        0.53
+      ],
+      "goal_position": [
+        0.4,
+        0.2
+      ]
+    },
+    {
+      "task_id": 25,
+      "start_position": [
+        0.41,
+        0.57
+      ],
+      "goal_position": [
+        0.11,
+        0.95
+      ]
+    },
+    {
+      "task_id": 26,
+      "start_position": [
+        0.68,
+        0.94
+      ],
+      "goal_position": [
+        0.03,
+        0.68
+      ]
+    },
+    {
+      "task_id": 27,
+      "start_position": [
+        0.83,
+        0.45
+      ],
+      "goal_position": [
+        0.08,
+        0.75
+      ]
+    },
+    {
+      "task_id": 28,
+      "start_position": [
+        0.34,
+        0.31
+      ],
+      "goal_position": [
+        0.17,
+        0.08
+      ]
+    },
+    {
+      "task_id": 29,
+      "start_position": [
+        0.1,
+        0.52
+      ],
+      "goal_position": [
+        0.38,
+        0.51
+      ]
+    },
+    {
+      "task_id": 30,
+      "start_position": [
+        0.91,
+        0.25
+      ],
+      "goal_position": [
+        0.62,
+        0.04
+      ]
+    },
+    {
+      "task_id": 31,
+      "start_position": [
+        0.06,
+        0.16
+      ],
+      "goal_position": [
+        0.44,
+        0.37
+      ]
+    },
+    {
+      "task_id": 32,
+      "start_position": [
+        0.3,
+        0.86
+      ],
+      "goal_position": [
+        0.57,
+        0.34
+      ]
+    },
+    {
+      "task_id": 33,
+      "start_position": [
+        0.61,
+        0.86
+      ],
+      "goal_position": [
+        0.2,
+        0.4
+      ]
+    },
+    {
+      "task_id": 34,
+      "start_position": [
+        0.22,
+        0.51
+      ],
+      "goal_position": [
+        0.14,
+        0.34
+      ]
+    },
+    {
+      "task_id": 35,
+      "start_position": [
+        0.99,
+        0.91
+      ],
+      "goal_position": [
+        0.02,
+        0.35
+      ]
+    },
+    {
+      "task_id": 36,
+      "start_position": [
+        0.81,
+        0.83
+      ],
+      "goal_position": [
+        0.32,
+        0.66
+      ]
+    },
+    {
+      "task_id": 37,
+      "start_position": [
+        0.12,
+        0.78
+      ],
+      "goal_position": [
+        0.73,
+        0.56
+      ]
+    },
+    {
+      "task_id": 38,
+      "start_position": [
+        0.77,
+        0.98
+      ],
+      "goal_position": [
+        0.23,
+        0.02
+      ]
+    },
+    {
+      "task_id": 39,
+      "start_position": [
+        0.62,
+        0.2
+      ],
+      "goal_position": [
+        0.86,
+        0.75
+      ]
+    },
+    {
+      "task_id": 40,
+      "start_position": [
+        0.47,
+        0.78
+      ],
+      "goal_position": [
+        0.94,
+        0.72
+      ]
+    },
+    {
+      "task_id": 41,
+      "start_position": [
+        0.27,
+        0.46
+      ],
+      "goal_position": [
+        0.09,
+        0.63
+      ]
+    },
+    {
+      "task_id": 42,
+      "start_position": [
+        0.33,
+        0.15
+      ],
+      "goal_position": [
+        0.8,
+        0.03
+      ]
+    },
+    {
+      "task_id": 43,
+      "start_position": [
+        0.17,
+        0.27
+      ],
+      "goal_position": [
+        0.82,
+        0.12
+      ]
+    },
+    {
+      "task_id": 44,
+      "start_position": [
+        0.98,
+        0.78
+      ],
+      "goal_position": [
+        0.42,
+        0.62
+      ]
+    },
+    {
+      "task_id": 45,
+      "start_position": [
+        0.68,
+        0.78
+      ],
+      "goal_position": [
+        0.25,
+        0.87
+      ]
+    },
+    {
+      "task_id": 46,
+      "start_position": [
+        0.71,
+        0.11
+      ],
+      "goal_position": [
+        0.02,
+        0.64
+      ]
+    },
+    {
+      "task_id": 47,
+      "start_position": [
+        0.81,
+        0.67
+      ],
+      "goal_position": [
+        0.8,
+        0.01
+      ]
+    },
+    {
+      "task_id": 48,
+      "start_position": [
+        0.92,
+        0.37
+      ],
+      "goal_position": [
+        0.41,
+        0.78
+      ]
+    },
+    {
+      "task_id": 49,
+      "start_position": [
+        0.57,
+        0.44
+      ],
+      "goal_position": [
+        0.1,
+        0.9
+      ]
+    }
+  ]
+}

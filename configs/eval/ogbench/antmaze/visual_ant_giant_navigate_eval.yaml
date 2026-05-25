@@ -1,0 +1,47 @@
+env_type: 'OGBenchEnv'
+ogbench_env_type: 'AntMaze'
+ogbench_task_name: 'visual-antmaze-giant-navigate-v0'
+save_dir: './results/OGBenchEnv_Ant_Maze/'
+
+# observation type
+obs_type: 'image'
+
+# data collection
+load_offline_dataset: True
+sampling_discount: 0.6
+
+# training configuration
+train: False
+test: True
+
+dynamics_num_layers: 2
+multistep_horizon: 5
+prior_num_layers: 2
+batch_size: 256
+
+# visualization
+render: True
+show_graph: True
+
+# evaluation
+get_success_rate: True
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  seed: [0, 1, 2, 3]
+
+  # training steps sweep
+  allo_training_steps: [500000]
+  dynamics_training_steps: [500000]
+  prior_training_steps: [500000]
+  checkpoint_fractions: [[0.6, 0.8, 1.0]]
+
+  # eval sweep
+  num_clusters: [128]
+  horizon: [10]
+  use_planner: [True]
+  eval_checkpoint: [60, 80, 100]

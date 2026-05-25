@@ -1,0 +1,26 @@
+env_type: 'OGBenchEnv'
+ogbench_env_type: 'AntMaze'
+ogbench_task_name: 'antmaze-large-explore-v0'
+save_dir: './results/OGBenchEnv_Ant_Maze/'
+
+# data collection
+load_offline_dataset: True
+sampling_discount: 0.6
+
+# training configuration
+train: True
+test: False
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  seed: [0, 1, 2, 3, 4, 5, 6, 7]
+
+  # training steps sweep
+  allo_training_steps: [1000000]
+  dynamics_training_steps: [1000000]
+  prior_training_steps: [1000000]
+  checkpoint_fractions: [[0.8, 0.9, 1.0]]
