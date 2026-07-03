@@ -123,24 +123,24 @@ class Prior(nnx.Module):
             print("Image observations: no state normalization needed for prior")
         else:
             # raw observation stats for flat observations
-            self.state_mean.value = jnp.mean(all_observations, axis=0)
-            self.state_std.value = jnp.std(all_observations, axis=0) + 1e-6
+            self.state_mean[...] = jnp.mean(all_observations, axis=0)
+            self.state_std[...] = jnp.std(all_observations, axis=0) + 1e-6
 
         # eigenspace stats
-        self.z_mean.value = jnp.mean(all_z, axis=0)
-        self.z_std.value = jnp.std(all_z, axis=0) + 1e-6
+        self.z_mean[...] = jnp.mean(all_z, axis=0)
+        self.z_std[...] = jnp.std(all_z, axis=0) + 1e-6
 
         print("Prior Stats Set")
 
     def _normalize_z(self, current_z, target_z):
         """normalize z representations"""
-        norm_current_z = (current_z - self.z_mean.value) / self.z_std.value
-        norm_target_z = (target_z - self.z_mean.value) / self.z_std.value
+        norm_current_z = (current_z - self.z_mean[...]) / self.z_std[...]
+        norm_target_z = (target_z - self.z_mean[...]) / self.z_std[...]
         return norm_current_z, norm_target_z
 
     def _normalize_inputs_flat(self, current_obs, current_z, target_z):
         """normalize inputs for flat observations"""
-        norm_obs = (current_obs - self.state_mean.value) / self.state_std.value
+        norm_obs = (current_obs - self.state_mean[...]) / self.state_std[...]
         norm_current_z, norm_target_z = self._normalize_z(current_z, target_z)
         return norm_obs, norm_current_z, norm_target_z
 
@@ -212,16 +212,16 @@ class Prior(nnx.Module):
         """save prior checkpoint"""
         # get state from net
         _, net_state = nnx.split(self.net)
-        net_flat = dict(net_state.flat_state())
+        net_flat = dict(nnx.to_flat_state(net_state))
         # convert tuple keys to string paths for compatibility with replace_by_pure_dict
-        net_state_dict = {'/'.join(map(str, k)): np.array(v.value) for k, v in net_flat.items()}
+        net_state_dict = {'/'.join(map(str, k)): np.array(v[...]) for k, v in net_flat.items()}
 
         save_data = {
             'net_state_dict': net_state_dict,
             'obs_type': self.obs_type,
             'stats': {
-                'z_mean': np.array(self.z_mean.value),
-                'z_std': np.array(self.z_std.value),
+                'z_mean': np.array(self.z_mean[...]),
+                'z_std': np.array(self.z_std[...]),
             },
             'config': {
                 'state_dim': self.state_dim,
@@ -234,11 +234,11 @@ class Prior(nnx.Module):
         # save encoder state for images
         if self.obs_type == 'image':
             _, encoder_state = nnx.split(self.encoder)
-            encoder_flat = dict(encoder_state.flat_state())
-            save_data['encoder_state_dict'] = {'/'.join(map(str, k)): np.array(v.value) for k, v in encoder_flat.items()}
+            encoder_flat = dict(nnx.to_flat_state(encoder_state))
+            save_data['encoder_state_dict'] = {'/'.join(map(str, k)): np.array(v[...]) for k, v in encoder_flat.items()}
         else:
-            save_data['stats']['state_mean'] = np.array(self.state_mean.value)
-            save_data['stats']['state_std'] = np.array(self.state_std.value)
+            save_data['stats']['state_mean'] = np.array(self.state_mean[...])
+            save_data['stats']['state_std'] = np.array(self.state_std[...])
 
         with open(filepath, 'wb') as f:
             pickle.dump(save_data, f)
@@ -274,26 +274,26 @@ class Prior(nnx.Module):
         # restore net state by directly updating values
         _, net_state = nnx.split(wrapper.net)
         normalized_net_dict = {to_tuple_key(k): v for k, v in net_state_dict.items()}
-        for path, var_state in net_state.flat_state():
+        for path, var_state in nnx.to_flat_state(net_state):
             if path in normalized_net_dict:
-                var_state.value = jnp.array(normalized_net_dict[path])
+                var_state[...] = jnp.array(normalized_net_dict[path])
 
         # restore encoder state for images
         if obs_type == 'image' and 'encoder_state_dict' in data:
             encoder_state_dict = data['encoder_state_dict']
             _, encoder_state = nnx.split(wrapper.encoder)
             normalized_encoder_dict = {to_tuple_key(k): v for k, v in encoder_state_dict.items()}
-            for path, var_state in encoder_state.flat_state():
+            for path, var_state in nnx.to_flat_state(encoder_state):
                 if path in normalized_encoder_dict:
-                    var_state.value = jnp.array(normalized_encoder_dict[path])
+                    var_state[...] = jnp.array(normalized_encoder_dict[path])
 
         # restore stats
-        wrapper.z_mean.value = jnp.array(stats['z_mean'])
-        wrapper.z_std.value = jnp.array(stats['z_std'])
+        wrapper.z_mean[...] = jnp.array(stats['z_mean'])
+        wrapper.z_std[...] = jnp.array(stats['z_std'])
 
         if obs_type != 'image' and 'state_mean' in stats:
-            wrapper.state_mean.value = jnp.array(stats['state_mean'])
-            wrapper.state_std.value = jnp.array(stats['state_std'])
+            wrapper.state_mean[...] = jnp.array(stats['state_mean'])
+            wrapper.state_std[...] = jnp.array(stats['state_std'])
 
         # recreate optimizers
         wrapper.optimizer = nnx.Optimizer(wrapper.net, optax.adam(args.prior_step_size), wrt=nnx.Param)

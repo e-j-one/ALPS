@@ -77,7 +77,7 @@ class Encoder(nnx.Module):
             x = jnp.reshape(x, (x.shape[0], -1))
         else:
             # normalize raw state coordinates/observations
-            x = (x - self.mean.value) / self.std.value
+            x = (x - self.mean[...]) / self.std[...]
 
         return self.mlp_layers(x)
 
@@ -171,8 +171,8 @@ class ALLO(nnx.Module):
             return
 
         all_observations = buffer.observations[:buffer.current_size]
-        self.encoder.mean.value = jnp.mean(all_observations, axis=0)
-        self.encoder.std.value = jnp.std(all_observations, axis=0) + 1e-8
+        self.encoder.mean[...] = jnp.mean(all_observations, axis=0)
+        self.encoder.std[...] = jnp.std(all_observations, axis=0) + 1e-8
         print("ALLO Observation Statistics Set")
         
     def train_step(self, observations: jnp.ndarray, next_observations: jnp.ndarray, observations_2: jnp.ndarray) -> Dict[str, Any]:
@@ -184,8 +184,8 @@ class ALLO(nnx.Module):
         )
 
         # update dual variables and barrier coefficients
-        self.encoder.dual_variables.value = jnp.clip(self.encoder.dual_variables.value, self.args.min_duals, self.args.max_duals)
-        self.encoder.barrier_coefficients.value = jnp.clip(self.encoder.barrier_coefficients.value, self.args.min_barrier_coefs, self.args.max_barrier_coefs)
+        self.encoder.dual_variables[...] = jnp.clip(self.encoder.dual_variables[...], self.args.min_duals, self.args.max_duals)
+        self.encoder.barrier_coefficients[...] = jnp.clip(self.encoder.barrier_coefficients[...], self.args.min_barrier_coefs, self.args.max_barrier_coefs)
         
         return metrics
     
@@ -193,7 +193,7 @@ class ALLO(nnx.Module):
     def _get_representations_jit(self, observations: jnp.ndarray, use_scaling: bool = False, skip_first: bool = True):
         representations = self.encoder(observations)
         
-        diagonal_duals = jnp.diag(self.encoder.dual_variables.value)
+        diagonal_duals = jnp.diag(self.encoder.dual_variables[...])
         eigenvalues = -diagonal_duals / 2.0
         
         if skip_first:
@@ -211,7 +211,7 @@ class ALLO(nnx.Module):
         """non-JIT version for use inside other JIT-compiled functions"""
         representations = self.encoder(observations)
         
-        diagonal_duals = jnp.diag(self.encoder.dual_variables.value)
+        diagonal_duals = jnp.diag(self.encoder.dual_variables[...])
         eigenvalues = -diagonal_duals / 2.0
         
         if skip_first:
@@ -234,14 +234,14 @@ class ALLO(nnx.Module):
         return representations_jax[0]
     
     def get_eigenvalue_estimates(self) -> jnp.ndarray:
-        diagonal_duals = jnp.diag(self.encoder.dual_variables.value)
+        diagonal_duals = jnp.diag(self.encoder.dual_variables[...])
         return -diagonal_duals / 2.0
     
     def checkpoint(self, filepath: str):
         """save model checkpoint"""
         _, state = nnx.split(self.encoder)
-        flat_state = dict(state.flat_state())
-        state_dict = {'/'.join(map(str, k)): np.array(v.value) for k, v in flat_state.items()}
+        flat_state = dict(nnx.to_flat_state(state))
+        state_dict = {'/'.join(map(str, k)): np.array(v[...]) for k, v in flat_state.items()}
 
         save_data = {
             'state_dict': state_dict,
@@ -256,8 +256,8 @@ class ALLO(nnx.Module):
         # save normalization stats for flat observations
         if self.args.obs_type != 'image':
             save_data['stats'] = {
-                'mean': np.array(self.encoder.mean.value),
-                'std': np.array(self.encoder.std.value)
+                'mean': np.array(self.encoder.mean[...]),
+                'std': np.array(self.encoder.std[...])
             }
 
         with open(filepath, 'wb') as f:
@@ -295,15 +295,15 @@ class ALLO(nnx.Module):
 
         normalized_dict = {to_tuple_key(k): v for k, v in state_dict.items()}
 
-        for path, var_state in state.flat_state():
+        for path, var_state in nnx.to_flat_state(state):
             if path in normalized_dict:
-                var_state.value = jnp.array(normalized_dict[path])
+                var_state[...] = jnp.array(normalized_dict[path])
         
         # restore normalization stats for flat observations
         if obs_type != 'image' and 'stats' in data:
             stats = data['stats']
-            allo_instance.encoder.mean.value = jnp.array(stats['mean'])
-            allo_instance.encoder.std.value = jnp.array(stats['std'])
+            allo_instance.encoder.mean[...] = jnp.array(stats['mean'])
+            allo_instance.encoder.std[...] = jnp.array(stats['std'])
 
         allo_instance.encoder_optimizer = nnx.Optimizer(allo_instance.encoder, optax.adam(args.allo_step_size), wrt=nnx.Param)
 

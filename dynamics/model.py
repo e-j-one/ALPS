@@ -32,22 +32,22 @@ class ForwardModel(nnx.Module):
 
     def set_stats(self, state_mean, state_std, delta_mean, delta_std):
         """set normalization statistics"""
-        self.state_mean.value = jnp.array(state_mean)
-        self.state_std.value = jnp.array(state_std)
-        self.delta_mean.value = jnp.array(delta_mean)
-        self.delta_std.value = jnp.array(delta_std)
+        self.state_mean[...] = jnp.array(state_mean)
+        self.state_std[...] = jnp.array(state_std)
+        self.delta_mean[...] = jnp.array(delta_mean)
+        self.delta_std[...] = jnp.array(delta_std)
 
     def __call__(self, state, action):
         """forward pass through the model"""
         # normalize input
-        norm_state = (state - self.state_mean.value) / self.state_std.value
+        norm_state = (state - self.state_mean[...]) / self.state_std[...]
         norm_input = jnp.concatenate([norm_state, action], axis=-1)
 
         # predict normalized delta
         norm_delta = self.dynamics_net(norm_input)
 
         # denormalize delta
-        delta = norm_delta * self.delta_std.value + self.delta_mean.value
+        delta = norm_delta * self.delta_std[...] + self.delta_mean[...]
 
         return state + delta
 
@@ -247,13 +247,13 @@ class Dynamics(nnx.Module):
         if self.obs_type == 'image':
             return
 
-        self.state_mean.value = jnp.array(obs_mean)
-        self.state_std.value = jnp.array(obs_std)
-        self.delta_mean.value = jnp.array(delta_mean)
-        self.delta_std.value = jnp.array(delta_std)
+        self.state_mean[...] = jnp.array(obs_mean)
+        self.state_std[...] = jnp.array(obs_std)
+        self.delta_mean[...] = jnp.array(delta_mean)
+        self.delta_std[...] = jnp.array(delta_std)
 
         # set stats in the inner model
-        self.model.set_stats(self.state_mean.value, self.state_std.value, self.delta_mean.value, self.delta_std.value)
+        self.model.set_stats(self.state_mean[...], self.state_std[...], self.delta_mean[...], self.delta_std[...])
 
     @nnx.jit
     def _update_step_flat(self, start_states: jnp.ndarray, action_seqs: jnp.ndarray, target_state_seqs: jnp.ndarray) -> Tuple[jnp.ndarray, Dict[str, Any]]:
@@ -285,8 +285,8 @@ class Dynamics(nnx.Module):
     def checkpoint(self, filepath: str):
         """save dynamics model checkpoint"""
         _, state = nnx.split(self.model)
-        flat_state = dict(state.flat_state())
-        state_dict = {'/'.join(map(str, k)): np.array(v.value) for k, v in flat_state.items()}
+        flat_state = dict(nnx.to_flat_state(state))
+        state_dict = {'/'.join(map(str, k)): np.array(v[...]) for k, v in flat_state.items()}
 
         save_data = {
             'state_dict': state_dict,
@@ -301,10 +301,10 @@ class Dynamics(nnx.Module):
         # only save stats for flat observations
         if self.obs_type != 'image':
             save_data['stats'] = {
-                'state_mean': np.array(self.state_mean.value),
-                'state_std': np.array(self.state_std.value),
-                'delta_mean': np.array(self.delta_mean.value),
-                'delta_std': np.array(self.delta_std.value)
+                'state_mean': np.array(self.state_mean[...]),
+                'state_std': np.array(self.state_std[...]),
+                'delta_mean': np.array(self.delta_mean[...]),
+                'delta_std': np.array(self.delta_std[...])
             }
 
         with open(filepath, 'wb') as f:
@@ -346,20 +346,20 @@ class Dynamics(nnx.Module):
 
         normalized_dict = {to_tuple_key(k): v for k, v in state_dict.items()}
 
-        for path, var_state in state.flat_state():
+        for path, var_state in nnx.to_flat_state(state):
             if path in normalized_dict:
-                var_state.value = jnp.array(normalized_dict[path])
+                var_state[...] = jnp.array(normalized_dict[path])
 
         # restore stats for flat observations only
         if obs_type != 'image' and 'stats' in data:
             stats = data['stats']
-            wrapper.state_mean.value = jnp.array(stats['state_mean'])
-            wrapper.state_std.value = jnp.array(stats['state_std'])
-            wrapper.delta_mean.value = jnp.array(stats['delta_mean'])
-            wrapper.delta_std.value = jnp.array(stats['delta_std'])
+            wrapper.state_mean[...] = jnp.array(stats['state_mean'])
+            wrapper.state_std[...] = jnp.array(stats['state_std'])
+            wrapper.delta_mean[...] = jnp.array(stats['delta_mean'])
+            wrapper.delta_std[...] = jnp.array(stats['delta_std'])
             # also set in inner model
-            wrapper.model.set_stats(wrapper.state_mean.value, wrapper.state_std.value,
-                                    wrapper.delta_mean.value, wrapper.delta_std.value)
+            wrapper.model.set_stats(wrapper.state_mean[...], wrapper.state_std[...],
+                                    wrapper.delta_mean[...], wrapper.delta_std[...])
 
         wrapper.optimizer = nnx.Optimizer(wrapper.model, optax.adam(args.dynamics_step_size), wrt=nnx.Param)
 
