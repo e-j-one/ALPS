@@ -110,6 +110,7 @@ class EvalArgs:
     
     # evaluation
     get_success_rate: bool = False
+    eval_cem_planner: bool = True           # also evaluate the flat CEM ablation (doubles eval time)
     eval_checkpoint: int = 100              # checkpoint selection for evaluation
 
     # === RoomEnv specific ===

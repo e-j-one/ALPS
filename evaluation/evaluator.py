@@ -61,7 +61,7 @@ def evaluate_planners(planner: Planner, args: Union[TrainArgs, EvalArgs], save_d
     
     # get planners
     hierarchical_planner = planner.get_hierarchical_planner()
-    cem_planner = planner.get_cem_planner()
+    cem_planner = planner.get_cem_planner() if args.eval_cem_planner else None
     
     # store results
     hierarchical_plans: List[PlanResult] = []
@@ -94,10 +94,11 @@ def evaluate_planners(planner: Planner, args: Union[TrainArgs, EvalArgs], save_d
             failed_ids_hierarchical.append((task_id, eval_idx))
 
         # === CEM PLANNER ===
-        c_plan = cem_planner.plan(start_position, goal_position, task_id=task_id, eval_idx=eval_idx, record_video=record_video)
-        cem_plans.append(c_plan)
-        if not c_plan.success:
-            failed_ids_cem.append((task_id, eval_idx))
+        if cem_planner is not None:
+            c_plan = cem_planner.plan(start_position, goal_position, task_id=task_id, eval_idx=eval_idx, record_video=record_video)
+            cem_plans.append(c_plan)
+            if not c_plan.success:
+                failed_ids_cem.append((task_id, eval_idx))
 
         # clear JAX caches to avoid memory issues
         jax.clear_caches()
@@ -106,7 +107,7 @@ def evaluate_planners(planner: Planner, args: Union[TrainArgs, EvalArgs], save_d
     
     # compute metrics
     h_metrics = compute_success_metrics(hierarchical_plans, 'hierarchical')
-    c_metrics = compute_success_metrics(cem_plans, 'cem')
+    c_metrics = compute_success_metrics(cem_plans, 'cem') if cem_planner is not None else {}
     cluster_metrics = compute_cluster_metrics(hierarchical_plans)
     
     # combine all metrics
@@ -132,7 +133,8 @@ def print_evaluation_summary(metrics: Dict[str, Any]):
     # overall success rates
     print(f"\n SUCCESS RATES")
     print(f"  Hierarchical: {metrics['success_rate_hierarchical']:.2%} ({metrics['success_count_hierarchical']}/{metrics['num_tasks']})")
-    print(f"  CEM:          {metrics['success_rate_cem']:.2%} ({metrics['success_count_cem']}/{metrics['num_tasks']})")
+    if 'success_rate_cem' in metrics:
+        print(f"  CEM:          {metrics['success_rate_cem']:.2%} ({metrics['success_count_cem']}/{metrics['num_tasks']})")
     
     # goal cluster reaching (hierarchical only)
     print(f"\n GOAL CLUSTER REACHING (Hierarchical)")
@@ -150,7 +152,9 @@ def print_evaluation_summary(metrics: Dict[str, Any]):
     else:
         print(f"  Hierarchical: N/A (no successful plans)")
     
-    if metrics['avg_steps_success_cem'] is not None:
+    if 'success_rate_cem' not in metrics:
+        pass
+    elif metrics['avg_steps_success_cem'] is not None:
         print(f"  CEM:          {metrics['avg_steps_success_cem']:.1f} ± {metrics['std_steps_success_cem']:.1f}")
     else:
         print(f"  CEM:          N/A (no successful plans)")
@@ -162,7 +166,9 @@ def print_evaluation_summary(metrics: Dict[str, Any]):
     else:
         print(f"  Hierarchical: {metrics['failure_count_hierarchical']} failures (no failures - 100% success!)")
     
-    if metrics['avg_distance_failed_cem'] is not None:
+    if 'success_rate_cem' not in metrics:
+        pass
+    elif metrics['avg_distance_failed_cem'] is not None:
         print(f"  CEM:          {metrics['failure_count_cem']} failures, avg final distance: {metrics['avg_distance_failed_cem']:.4f}")
     else:
         print(f"  CEM:          {metrics['failure_count_cem']} failures (no failures - 100% success!)")

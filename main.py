@@ -151,11 +151,12 @@ def planning(env: Union[RoomEnv, gym.Env], env_helper: EnvironmentHelper, proces
     else:
         hierarchical_planner.plan(start_position, goal_position, record_video=args.render)
 
-    print(f"\nRunning CEM planning...")
-    if args.env_type == 'OGBenchEnv':
-        cem_planner.plan(task_id=1, record_video=args.render)
-    else:
-        cem_planner.plan(start_position, goal_position, record_video=args.render)
+    if args.eval_cem_planner:
+        print(f"\nRunning CEM planning...")
+        if args.env_type == 'OGBenchEnv':
+            cem_planner.plan(task_id=1, record_video=args.render)
+        else:
+            cem_planner.plan(start_position, goal_position, record_video=args.render)
 
     return planner
 
