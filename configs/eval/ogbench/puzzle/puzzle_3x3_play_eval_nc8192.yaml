@@ -1,0 +1,40 @@
+env_type: 'OGBenchEnv'
+ogbench_env_type: 'Puzzle'
+ogbench_task_name: 'puzzle-3x3-play-v0'
+save_dir: './results/OGBenchEnv_Puzzle/'
+
+# data collection
+load_offline_dataset: True
+sampling_discount: 0.2
+
+# training configuration
+train: False
+test: True
+
+# visualization
+render: True
+show_graph: True
+
+# evaluation
+get_success_rate: True
+eval_cem_planner: False
+
+# ===================
+# SWEEP CONFIGURATION
+# ===================
+
+sweep:
+  num_eigenvectors: [32]
+  seed: [0, 1, 2, 3, 4, 5, 6, 7]
+
+  # training steps sweep
+  allo_training_steps: [1000000]
+  dynamics_training_steps: [1000000]
+  prior_training_steps: [1000000]
+  checkpoint_fractions: [[0.8, 0.9, 1.0]]
+
+  # eval sweep
+  num_clusters: [8192]
+  use_planner: [True]
+  sigma: [0.1]
+  eval_checkpoint: [80, 90, 100]
