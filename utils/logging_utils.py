@@ -7,6 +7,9 @@ from params import TrainArgs, EvalArgs, Args
 import itertools
 import hashlib
 
+# TrainArgs fields added after results existed: left out of the train hash at their default so old run dirs still resolve
+_TRAIN_HASH_OMIT_IF_DEFAULT = {'dataset_replace_interval': 1000}
+
 
 def create_sweep_args(d):
     """
@@ -201,7 +204,8 @@ def setup_logging(args: Args):
     
     args_dict = asdict(args)
     train_hash_dict = dict(sorted(
-        {k: v for k, v in args_dict.items() if k in base_fields and k != 'seed'}.items()
+        {k: v for k, v in args_dict.items()
+         if k in base_fields and k != 'seed' and not (k in _TRAIN_HASH_OMIT_IF_DEFAULT and v == _TRAIN_HASH_OMIT_IF_DEFAULT[k])}.items()
     ))
     
     hasher.update(str(train_hash_dict).encode())

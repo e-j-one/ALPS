@@ -24,14 +24,18 @@ def train_dynamics(dynamics: Dynamics, buffer: Buffer, args: TrainArgs, ckpt_dir
     # prepare episode metadata
     print("Preparing episode data...")
 
-    # filter episodes long enough for multi-step training
-    valid_mask = buffer._ep_lens_np >= (dynamics.horizon + 1)
-    valid_ep_starts = buffer._ep_starts_np[valid_mask]
-    valid_ep_lens = buffer._ep_lens_np[valid_mask]
+    def prepare_episode_data():
+        # filter episodes long enough for multi-step training
+        valid_mask = buffer._ep_lens_np >= (dynamics.horizon + 1)
+        valid_ep_starts = buffer._ep_starts_np[valid_mask]
+        valid_ep_lens = buffer._ep_lens_np[valid_mask]
 
-    # get all data from buffer
-    all_observations = buffer.observations[:buffer.current_size]
-    all_actions = buffer.actions[:buffer.current_size]
+        # get all data from buffer
+        all_observations = buffer.observations[:buffer.current_size]
+        all_actions = buffer.actions[:buffer.current_size]
+        return valid_ep_starts, valid_ep_lens, all_observations, all_actions
+
+    valid_ep_starts, valid_ep_lens, all_observations, all_actions = prepare_episode_data()
 
     # compute normalization statistics
     dynamics.compute_stats(buffer)
@@ -48,6 +52,10 @@ def train_dynamics(dynamics: Dynamics, buffer: Buffer, args: TrainArgs, ckpt_dir
 
         # update with autoregressive loss
         loss, metrics = dynamics.update_step(batch_start_states, batch_actions, batch_target_states)
+
+        # swap in the next shard (sharded datasets only)
+        if buffer.maybe_rotate_shard(step + 1):
+            valid_ep_starts, valid_ep_lens, all_observations, all_actions = prepare_episode_data()
 
         if step % 5000 == 0 and not args.debug:
             wandb.log({

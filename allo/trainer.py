@@ -38,6 +38,9 @@ def train_allo(allo: ALLO, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: 
         
         # training step
         metrics = allo.train_step(batch_obs, batch_next_obs, batch_obs_2)
+
+        # swap in the next shard (sharded datasets only)
+        buffer.maybe_rotate_shard(step + 1)
         
         # logging
         if step % 5000 == 0 and not args.debug:

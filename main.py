@@ -1,5 +1,6 @@
 import os
 import random
+from functools import partial
 import tyro
 import wandb
 import numpy as np
@@ -9,7 +10,7 @@ import gymnasium as gym
 import ogbench
 
 from params import Args
-from envs import RoomEnv, setup_environment
+from envs import RoomEnv, setup_environment, is_sharded_ogbench_dataset, list_ogbench_shards, load_ogbench_shard
 from utils import Buffer, DiscountedReplayBuffer, EnvironmentHelper, setup_logging
 from allo import ALLO, ALLOProcessor, train_allo
 from dynamics import Dynamics, train_dynamics
@@ -22,7 +23,19 @@ from evaluation import evaluate_planners
 
 def get_buffer(env: Union[RoomEnv, gym.Env], args: Args, obs_shape: tuple, action_dim: int, key: jax.random.PRNGKey) -> Buffer:
     """load/generate data"""
-    if args.env_type == "OGBenchEnv" and args.load_offline_dataset:
+    if args.env_type == "OGBenchEnv" and args.load_offline_dataset and is_sharded_ogbench_dataset(args.ogbench_task_name):
+        # large sharded dataset: hold one shard in memory and rotate during training (as in horizon-reduction)
+        shard_paths = list_ogbench_shards(os.path.join('./data', args.ogbench_task_name))
+        print(f"\nLoading sharded dataset: {len(shard_paths)} shards, replacing every {args.dataset_replace_interval} steps")
+        loader = partial(load_ogbench_shard, dataset_name=args.ogbench_task_name)
+
+        buffer = DiscountedReplayBuffer(args, 0, obs_shape, action_dim, key, allocate=False)
+        buffer.load_offline_dataset(loader(shard_paths[0]))
+        buffer.enable_shard_rotation(shard_paths, args.dataset_replace_interval, loader)
+        print(f"Loaded shard 1/{len(shard_paths)} with {buffer.num_episodes} episodes")
+
+        return buffer
+    elif args.env_type == "OGBenchEnv" and args.load_offline_dataset:
         print("\nLoading offline dataset...")
         _, train_dataset, _ = ogbench.make_env_and_datasets(args.ogbench_task_name, dataset_dir='./data', compact_dataset=True)
 
@@ -56,11 +69,13 @@ def train(buffer: Buffer, args: Args, model_dir: str, obs_shape: tuple, action_d
     dynamics_ckpt_dirs = {int(frac * args.dynamics_training_steps): checkpoint_dirs[int(frac * 100)] for frac in checkpoint_fractions}
 
     # train allo
+    buffer.reset_shard()
     allo = train_allo(allo, buffer, args, model_dir, allo_key, checkpoint_dirs=allo_ckpt_dirs)
 
     print("\n" + "="*50)
 
     # train dynamics
+    buffer.reset_shard()
     dynamics = train_dynamics(dynamics, buffer, args, model_dir, dynamics_key, checkpoint_dirs=dynamics_ckpt_dirs)
 
     print("\n" + "="*50)
@@ -80,6 +95,7 @@ def train(buffer: Buffer, args: Args, model_dir: str, obs_shape: tuple, action_d
         processor_for_prior = ALLOProcessor(allo_for_prior, args)
 
         prior_key, subkey = jax.random.split(prior_key)
+        buffer.reset_shard()
         fresh_prior = Prior(buffer, processor_for_prior, args, subkey)
         fresh_prior = train_gcbc_prior(
             fresh_prior, buffer, args, ckpt_subdir, subkey,
@@ -187,6 +203,7 @@ def main(args: Args) -> str:
 
     # load and evaluate models
     if args.test:
+        buffer.reset_shard()
         print("\n" + "="*50)
         processor, dynamics, prior = load_models(buffer, args, obs_shape, action_dim, checkpoint_dirs)
 

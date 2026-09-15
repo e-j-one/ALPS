@@ -121,6 +121,12 @@ class Buffer(ABC):
         self._ep_starts_np = None
         self._ep_lens_np = None
 
+        # shard rotation for sharded (100M/1B) datasets; inactive unless enable_shard_rotation is called
+        self.shard_paths = []
+        self.shard_idx = 0
+        self._shard_interval = 0
+        self._shard_loader = None
+
         seed = int(jax.random.randint(key, (1,), 0, 1000000)[0]) if key is not None else args.seed
         self.rng = np.random.default_rng(seed)
 
@@ -135,6 +141,30 @@ class Buffer(ABC):
         self.time_to_end = np.zeros(capacity, dtype=np.int32)
         self.episode_ids = np.zeros(capacity, dtype=np.int32)
         self.valid_indices = np.zeros(capacity, dtype=np.int32)
+
+    def enable_shard_rotation(self, shard_paths: List[str], interval: int, loader):
+        """rotate through dataset shards, holding one in memory at a time; shard 0 must already be loaded"""
+        self.shard_paths = list(shard_paths)
+        self.shard_idx = 0
+        self._shard_interval = interval
+        self._shard_loader = loader
+
+    def maybe_rotate_shard(self, num_updates: int) -> bool:
+        """load the next shard every `interval` updates (as in horizon-reduction); returns True if the data changed"""
+        if len(self.shard_paths) <= 1 or self._shard_interval <= 0 or num_updates % self._shard_interval != 0:
+            return False
+        self._load_shard((self.shard_idx + 1) % len(self.shard_paths))
+        return True
+
+    def reset_shard(self):
+        """reload the first shard so evaluation always uses the same data"""
+        if self.shard_paths and self.shard_idx != 0:
+            self._load_shard(0)
+
+    def _load_shard(self, idx: int):
+        self.shard_idx = idx
+        self.load_offline_dataset(self._shard_loader(self.shard_paths[idx]))
+        tqdm.write(f"  Loaded shard {idx + 1}/{len(self.shard_paths)}")
 
     def _cache_episode_arrays(self):
         """cache episode metadata"""

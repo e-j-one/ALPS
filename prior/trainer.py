@@ -19,22 +19,31 @@ def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: st
 
     print(f"\nTraining GCBC prior with Variable Horizon [{min_horizon}, {max_horizon}] for {steps} steps")
 
-    # get all data in raw observation space + eigenspace
+    # eigenspace projections per shard; ALLO is frozen here, so each shard is projected only once
+    z_cache = {}
+
+    def prepare_episode_data():
+        # get all data in raw observation space + eigenspace
+        all_observations = buffer.get_all_observations()
+        if buffer.shard_idx not in z_cache:
+            z_cache[buffer.shard_idx] = np.array(prior.processor.observations_to_eigenspace(all_observations))
+        all_z = z_cache[buffer.shard_idx]
+        all_actions = buffer.actions[:buffer.current_size]
+
+        # valid episodes for sampling
+        valid_mask = buffer._ep_lens_np > max_horizon
+        valid_ep_starts = buffer._ep_starts_np[valid_mask]
+        valid_ep_lens = buffer._ep_lens_np[valid_mask]
+
+        if len(valid_ep_starts) == 0:
+            raise ValueError(f"No episodes longer than max_horizon {max_horizon}. Longest episode: {np.max(buffer._ep_lens_np)}")
+        return all_observations, all_z, all_actions, valid_ep_starts, valid_ep_lens
+
     print("Preparing episode data...")
-    all_observations = buffer.get_all_observations()
-    all_z = np.array(prior.processor.observations_to_eigenspace(all_observations))
-    all_actions = buffer.actions[:buffer.current_size]
+    all_observations, all_z, all_actions, valid_ep_starts, valid_ep_lens = prepare_episode_data()
 
     # compute normalization stats from pre-computed data
     prior.compute_stats(all_observations, all_z)
-
-    # valid episodes for sampling
-    valid_mask = buffer._ep_lens_np > max_horizon
-    valid_ep_starts = buffer._ep_starts_np[valid_mask]
-    valid_ep_lens = buffer._ep_lens_np[valid_mask]
-
-    if len(valid_ep_starts) == 0:
-        raise ValueError(f"No episodes longer than max_horizon {max_horizon}. Longest episode: {np.max(buffer._ep_lens_np)}")
     
     rng = np.random.default_rng(int(jax.random.randint(key, (1,), 0, 2**31 - 1)[0]))
 
@@ -47,6 +56,10 @@ def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: st
         )
 
         loss = prior.update(current_obs, current_z, future_z, expert_action)
+
+        # swap in the next shard (sharded datasets only)
+        if buffer.maybe_rotate_shard(step + 1):
+            all_observations, all_z, all_actions, valid_ep_starts, valid_ep_lens = prepare_episode_data()
 
         # logging
         if step % 5000 == 0 and not args.debug:

@@ -1,6 +1,7 @@
 import ogbench
 
 from .room_envs import create_room_environment
+from .ogbench_datasets import ogbench_env_dataset_name
 from params import TrainArgs
 
 
@@ -28,7 +29,7 @@ def setup_ogbench_environment(args: TrainArgs, render_mode=None):
     if args.obs_type != "image":
         env_kwargs['width'] = 480
         env_kwargs['height'] = 480
-    env = ogbench.make_env_and_datasets(task, env_only=True, **env_kwargs)
+    env = ogbench.make_env_and_datasets(ogbench_env_dataset_name(task), env_only=True, **env_kwargs)
 
     env.reset(seed=args.seed)
 

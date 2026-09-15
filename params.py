@@ -20,6 +20,7 @@ class TrainArgs:
     
     # === DATA COLLECTION ===
     load_offline_dataset: bool = True
+    dataset_replace_interval: int = 1000            # sharded (-100m-) datasets: steps between shard swaps
     buffer_size: int = 500000
 
     # === MODEL ARCHITECTURE ===
