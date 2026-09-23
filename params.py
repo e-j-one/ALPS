@@ -130,3 +130,4 @@ class Args(TrainArgs, EvalArgs):
     test: bool = False
     use_wandb: bool = False
     project_name: str = 'ALPS'
+    flops_only: bool = False                # print total training FLOPs from shapes and exit (no training, no result dirs)

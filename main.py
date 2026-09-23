@@ -1,4 +1,5 @@
 import os
+import math
 import random
 from functools import partial
 import tyro
@@ -11,7 +12,7 @@ import ogbench
 
 from params import Args
 from envs import RoomEnv, setup_environment, is_sharded_ogbench_dataset, list_ogbench_shards, load_ogbench_shard
-from utils import Buffer, DiscountedReplayBuffer, EnvironmentHelper, setup_logging
+from utils import Buffer, DiscountedReplayBuffer, EnvironmentHelper, setup_logging, FlopsTracker, num_params
 from allo import ALLO, ALLOProcessor, train_allo
 from dynamics import Dynamics, train_dynamics
 from prior import Prior, train_gcbc_prior
@@ -58,6 +59,7 @@ def train(buffer: Buffer, args: Args, model_dir: str, obs_shape: tuple, action_d
     """ALLO, dynamics, and prior training function"""
     print("\n" + "="*50)
     allo_key, dynamics_key, prior_key = jax.random.split(key, 3)
+    flops_tracker = FlopsTracker(single_model_tag=f"{args.eval_checkpoint}%")
 
     # initialize models
     allo = ALLO(obs_shape[0], obs_shape, args, allo_key)
@@ -70,13 +72,13 @@ def train(buffer: Buffer, args: Args, model_dir: str, obs_shape: tuple, action_d
 
     # train allo
     buffer.reset_shard()
-    allo = train_allo(allo, buffer, args, model_dir, allo_key, checkpoint_dirs=allo_ckpt_dirs)
+    allo = train_allo(allo, buffer, args, model_dir, allo_key, checkpoint_dirs=allo_ckpt_dirs, flops_tracker=flops_tracker)
 
     print("\n" + "="*50)
 
     # train dynamics
     buffer.reset_shard()
-    dynamics = train_dynamics(dynamics, buffer, args, model_dir, dynamics_key, checkpoint_dirs=dynamics_ckpt_dirs)
+    dynamics = train_dynamics(dynamics, buffer, args, model_dir, dynamics_key, checkpoint_dirs=dynamics_ckpt_dirs, flops_tracker=flops_tracker)
 
     print("\n" + "="*50)
 
@@ -99,12 +101,49 @@ def train(buffer: Buffer, args: Args, model_dir: str, obs_shape: tuple, action_d
         fresh_prior = Prior(buffer, processor_for_prior, args, subkey)
         fresh_prior = train_gcbc_prior(
             fresh_prior, buffer, args, ckpt_subdir, subkey,
-            training_steps_override=prior_steps
+            training_steps_override=prior_steps,
+            flops_tracker=flops_tracker, flops_tag=f"{pct}%"
         )
 
         print(f"  prior for checkpoint_{pct} completed!")
 
+    flops_tracker.print_summary()
+    flops_tracker.log_wandb()
+
     print("\n" + "="*50)
+
+
+def count_training_flops(buffer: Buffer, args: Args, obs_shape: tuple, action_dim: int, key: jax.random.PRNGKey) -> FlopsTracker:
+    """training FLOPs of train() computed from shapes only (fresh models, nothing is trained or saved)"""
+    allo_key, dynamics_key, prior_key = jax.random.split(key, 3)
+    tracker = FlopsTracker(single_model_tag=f"{args.eval_checkpoint}%")
+    batch_size = args.batch_size
+
+    allo = ALLO(obs_shape[0], obs_shape, args, allo_key)
+    tracker.add('allo', allo.step_flops(batch_size), args.allo_training_steps,
+                samples_per_step=3 * batch_size, params=num_params(allo.encoder))
+
+    dynamics = Dynamics(action_dim, buffer, args, dynamics_key)
+    tracker.add('dynamics', dynamics.step_flops(batch_size), args.dynamics_training_steps,
+                samples_per_step=dynamics.horizon * batch_size, params=num_params(dynamics.model))
+
+    prior = Prior(buffer, ALLOProcessor(allo, args), args, prior_key)
+    prior_step_flops = prior.step_flops(batch_size)
+    psi_flops = math.ceil(buffer.current_size / batch_size) * allo.forward_flops(batch_size)
+    num_shards = max(len(buffer.shard_paths), 1)
+    for frac in args.checkpoint_fractions:
+        pct = int(frac * 100)
+        prior_steps = int(frac * args.prior_training_steps)
+        # prior projects each shard it visits once (approximated with the current shard's size)
+        if num_shards > 1 and args.dataset_replace_interval > 0:
+            shards_visited = min(num_shards, 1 + prior_steps // args.dataset_replace_interval)
+        else:
+            shards_visited = 1
+        tracker.add_once(f"psi_precompute@{pct}%", shards_visited * psi_flops, tag=f"{pct}%")
+        tracker.add(f"prior@{pct}%", prior_step_flops, prior_steps,
+                    samples_per_step=batch_size, params=num_params(prior.net, prior.encoder), tag=f"{pct}%")
+
+    return tracker
 
 
 def load_models( buffer: Buffer, args: Args, obs_shape: tuple, action_dim: int, checkpoint_dirs: dict):
@@ -191,6 +230,11 @@ def main(args: Args) -> str:
 
     # get replay buffer
     buffer = get_buffer(env, args, obs_shape, action_dim, buffer_key)
+
+    # dry run: training FLOPs only
+    if args.flops_only:
+        count_training_flops(buffer, args, obs_shape, action_dim, train_key).print_summary()
+        return None
 
     # setup logging
     model_dir, eval_dir, checkpoint_dirs = setup_logging(args)

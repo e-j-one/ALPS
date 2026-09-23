@@ -6,11 +6,12 @@ from tqdm import tqdm
 import wandb
 
 from params import TrainArgs
-from utils import Buffer
+from utils import Buffer, FlopsTracker, num_params
 from .model import ALLO
 
 
-def train_allo(allo: ALLO, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, checkpoint_dirs: Dict[int, str] = None) -> ALLO:
+def train_allo(allo: ALLO, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, checkpoint_dirs: Dict[int, str] = None,
+               flops_tracker: FlopsTracker = None) -> ALLO:
     """ALLO training function"""
     print(f"\nTraining ALLO for {args.allo_training_steps} steps")
     print(f"  Batch size: {args.batch_size}")
@@ -26,6 +27,11 @@ def train_allo(allo: ALLO, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: 
 
     # compute normalization statistics
     allo.compute_stats(buffer)
+
+    # training FLOPs (3 encoder passes per sample: current, next, random)
+    if flops_tracker is not None:
+        flops_tracker.add('allo', allo.step_flops(args.batch_size), args.allo_training_steps,
+                          samples_per_step=3 * args.batch_size, params=num_params(allo.encoder))
 
     sampling_discount = args.sampling_discount if args.use_discounted_sampling else 0.0
     

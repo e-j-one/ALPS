@@ -6,11 +6,12 @@ import wandb
 from tqdm import tqdm
 
 from params import TrainArgs
-from utils import Buffer, sample_sequence_batch
+from utils import Buffer, sample_sequence_batch, FlopsTracker, num_params
 from .model import Dynamics
 
 
-def train_dynamics(dynamics: Dynamics, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, checkpoint_dirs: Dict[int, str] = None):
+def train_dynamics(dynamics: Dynamics, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, checkpoint_dirs: Dict[int, str] = None,
+                   flops_tracker: FlopsTracker = None):
     """dynamics training function with autoregressive multi-step rollouts"""
     print(f"\nTraining Dynamics Model (Horizon={dynamics.horizon})")
 
@@ -39,6 +40,11 @@ def train_dynamics(dynamics: Dynamics, buffer: Buffer, args: TrainArgs, ckpt_dir
 
     # compute normalization statistics
     dynamics.compute_stats(buffer)
+
+    # training FLOPs (one model call per sample per rollout step)
+    if flops_tracker is not None:
+        flops_tracker.add('dynamics', dynamics.step_flops(args.batch_size), args.dynamics_training_steps,
+                          samples_per_step=dynamics.horizon * args.batch_size, params=num_params(dynamics.model))
     
     rng = np.random.default_rng(int(jax.random.randint(key, (1,), 0, 2**31 - 1)[0]))
 

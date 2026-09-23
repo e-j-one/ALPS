@@ -8,7 +8,7 @@ from functools import partial
 import pickle
 
 from params import TrainArgs
-from utils import Buffer
+from utils import Buffer, compiled_flops, sds
 
 jax.clear_caches()
 
@@ -189,6 +189,18 @@ class ALLO(nnx.Module):
         
         return metrics
     
+    def step_flops(self, batch_size: int) -> float:
+        """FLOPs of one train step (lowered from shapes only; eager dual/barrier clipping is O(d^2) and ignored)"""
+        obs = sds((batch_size,) + tuple(self.encoder.input_shape))
+        return compiled_flops(allo_update_step, self.encoder, self.encoder_optimizer, obs, obs, obs,
+                              step_size_duals=self.args.step_size_duals)
+
+    def forward_flops(self, batch_size: int) -> float:
+        """FLOPs of one representation batch (as used by ALLOProcessor.observations_to_eigenspace)"""
+        obs = sds((batch_size,) + tuple(self.encoder.input_shape))
+        return compiled_flops(ALLO._get_representations_jit, self, obs,
+                              use_scaling=self.args.use_scaling, skip_first=self.args.skip_first_eigenvector)
+
     @partial(nnx.jit, static_argnames=['use_scaling', 'skip_first'])
     def _get_representations_jit(self, observations: jnp.ndarray, use_scaling: bool = False, skip_first: bool = True):
         representations = self.encoder(observations)

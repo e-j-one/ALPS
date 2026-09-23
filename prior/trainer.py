@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import jax
 from tqdm import tqdm
@@ -5,11 +6,12 @@ import os
 import wandb
 
 from params import TrainArgs
-from utils import Buffer, sample_prior_batch
+from utils import Buffer, sample_prior_batch, FlopsTracker, num_params
 from .model import Prior
 
 
-def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, training_steps_override: int = None):
+def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: str, key: jax.random.PRNGKey, training_steps_override: int = None,
+                     flops_tracker: FlopsTracker = None, flops_tag: str = None):
     """train goal-conditioned BC prior with variable horizon hindsight relabeling"""
     # get training hyperparameters from args
     steps = training_steps_override if training_steps_override is not None else args.prior_training_steps
@@ -27,6 +29,10 @@ def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: st
         all_observations = buffer.get_all_observations()
         if buffer.shard_idx not in z_cache:
             z_cache[buffer.shard_idx] = np.array(prior.processor.observations_to_eigenspace(all_observations))
+            if flops_tracker is not None:
+                num_batches = math.ceil(len(all_observations) / batch_size)
+                flops_tracker.add_once(f"psi_precompute@{flops_tag}[shard{buffer.shard_idx}]",
+                                       num_batches * prior.processor.allo.forward_flops(batch_size), tag=flops_tag)
         all_z = z_cache[buffer.shard_idx]
         all_actions = buffer.actions[:buffer.current_size]
 
@@ -44,6 +50,11 @@ def train_gcbc_prior(prior: Prior, buffer: Buffer, args: TrainArgs, ckpt_dir: st
 
     # compute normalization stats from pre-computed data
     prior.compute_stats(all_observations, all_z)
+
+    # training FLOPs
+    if flops_tracker is not None:
+        flops_tracker.add(f"prior@{flops_tag}", prior.step_flops(batch_size), steps,
+                          samples_per_step=batch_size, params=num_params(prior.net, prior.encoder), tag=flops_tag)
     
     rng = np.random.default_rng(int(jax.random.randint(key, (1,), 0, 2**31 - 1)[0]))
 

@@ -6,6 +6,9 @@ from .env_helpers import EnvironmentHelper
 # logging
 from .logging_utils import setup_logging
 
+# training FLOPs
+from .flops import FlopsTracker, compiled_flops, num_params, sds
+
 
 
 __all__ = [
@@ -20,4 +23,10 @@ __all__ = [
     
     # logging
     'setup_logging',
+
+    # training FLOPs
+    'FlopsTracker',
+    'compiled_flops',
+    'num_params',
+    'sds',
 ]

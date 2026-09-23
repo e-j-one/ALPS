@@ -6,7 +6,7 @@ import pickle
 import numpy as np
 from typing import Tuple
 
-from utils import Buffer
+from utils import Buffer, compiled_flops, sds
 from allo import ALLOProcessor
 from params import TrainArgs
 
@@ -207,6 +207,14 @@ class Prior(nnx.Module):
             return self._update_image(current_obs, current_z, future_z, expert_action)
         else:
             return self._update_flat(current_obs, current_z, future_z, expert_action)
+
+    def step_flops(self, batch_size: int) -> float:
+        """FLOPs of one update step (lowered from shapes only)"""
+        obs = sds((batch_size,) + tuple(self.obs_shape))
+        z = sds((batch_size, self.z_dim))
+        action = sds((batch_size, self.action_dim))
+        update_fn = Prior._update_image if self.obs_type == 'image' else Prior._update_flat
+        return compiled_flops(update_fn, self, obs, z, z, action)
 
     def checkpoint(self, filepath: str):
         """save prior checkpoint"""

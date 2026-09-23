@@ -3,11 +3,12 @@ import jax
 import jax.numpy as jnp
 import flax.nnx as nnx
 import optax
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Union
+from functools import partial
 import pickle
 
 from params import TrainArgs
-from utils import Buffer, sample_sequence_batch
+from utils import Buffer, sample_sequence_batch, compiled_flops, sds
 from .architectures import MLP, CNNEncoder, CNNDecoder
 
 jax.clear_caches()
@@ -102,7 +103,7 @@ class ImageForwardModel(nnx.Module):
         return next_image
 
 
-def autoregressive_loss(model: ForwardModel, start_state, action_seq, target_state_seq):
+def autoregressive_loss(model: ForwardModel, start_state, action_seq, target_state_seq, unroll: Union[int, bool] = 1):
     """autoregressive loss function - unrolls model for H steps"""
     def step_fn(carry, inputs):
         curr_state = carry
@@ -122,7 +123,7 @@ def autoregressive_loss(model: ForwardModel, start_state, action_seq, target_sta
     targets_t = jnp.transpose(target_state_seq, (1, 0, 2))  # (H, batch, state_dim)
 
     _, step_losses = jax.lax.scan(
-        step_fn, start_state, (actions_t, targets_t)
+        step_fn, start_state, (actions_t, targets_t), unroll=unroll
     )
 
     total_loss = jnp.mean(step_losses)
@@ -133,7 +134,7 @@ def autoregressive_loss(model: ForwardModel, start_state, action_seq, target_sta
     return total_loss, metrics
 
 
-def autoregressive_loss_image(model: ImageForwardModel, start_image, action_seq, target_image_seq):
+def autoregressive_loss_image(model: ImageForwardModel, start_image, action_seq, target_image_seq, unroll: Union[int, bool] = 1):
     """autoregressive loss function for images - unrolls model for H steps"""
     def step_fn(carry, inputs):
         curr_image = carry
@@ -153,7 +154,7 @@ def autoregressive_loss_image(model: ImageForwardModel, start_image, action_seq,
     targets_t = jnp.transpose(target_image_seq, (1, 0, 2, 3, 4))  # (H, batch, H, W, C)
 
     _, step_losses = jax.lax.scan(
-        step_fn, start_image, (actions_t, targets_t)
+        step_fn, start_image, (actions_t, targets_t), unroll=unroll
     )
 
     total_loss = jnp.mean(step_losses)
@@ -255,21 +256,21 @@ class Dynamics(nnx.Module):
         # set stats in the inner model
         self.model.set_stats(self.state_mean[...], self.state_std[...], self.delta_mean[...], self.delta_std[...])
 
-    @nnx.jit
-    def _update_step_flat(self, start_states: jnp.ndarray, action_seqs: jnp.ndarray, target_state_seqs: jnp.ndarray) -> Tuple[jnp.ndarray, Dict[str, Any]]:
+    @partial(nnx.jit, static_argnames=['unroll'])
+    def _update_step_flat(self, start_states: jnp.ndarray, action_seqs: jnp.ndarray, target_state_seqs: jnp.ndarray, unroll: Union[int, bool] = 1) -> Tuple[jnp.ndarray, Dict[str, Any]]:
         """update step for flat observations"""
         (loss, metrics), grads = nnx.value_and_grad(
-            autoregressive_loss, has_aux=True
+            partial(autoregressive_loss, unroll=unroll), has_aux=True
         )(self.model, start_states, action_seqs, target_state_seqs)
 
         self.optimizer.update(self.model, grads)
         return loss, metrics
 
-    @nnx.jit
-    def _update_step_image(self, start_images: jnp.ndarray, action_seqs: jnp.ndarray, target_image_seqs: jnp.ndarray) -> Tuple[jnp.ndarray, Dict[str, Any]]:
+    @partial(nnx.jit, static_argnames=['unroll'])
+    def _update_step_image(self, start_images: jnp.ndarray, action_seqs: jnp.ndarray, target_image_seqs: jnp.ndarray, unroll: Union[int, bool] = 1) -> Tuple[jnp.ndarray, Dict[str, Any]]:
         """update step for image observations"""
         (loss, metrics), grads = nnx.value_and_grad(
-            autoregressive_loss_image, has_aux=True
+            partial(autoregressive_loss_image, unroll=unroll), has_aux=True
         )(self.model, start_images, action_seqs, target_image_seqs)
 
         self.optimizer.update(self.model, grads)
@@ -281,6 +282,15 @@ class Dynamics(nnx.Module):
             return self._update_step_image(start_states, action_seqs, target_state_seqs)
         else:
             return self._update_step_flat(start_states, action_seqs, target_state_seqs)
+
+    def step_flops(self, batch_size: int, unroll: Union[int, bool] = True) -> float:
+        """FLOPs of one update step (lowered from shapes only); the scan is unrolled since XLA counts a loop body once"""
+        obs_shape = tuple(self.obs_shape)
+        start = sds((batch_size,) + obs_shape)
+        actions = sds((batch_size, self.horizon, self.action_dim))
+        targets = sds((batch_size, self.horizon) + obs_shape)
+        update_fn = Dynamics._update_step_image if self.obs_type == 'image' else Dynamics._update_step_flat
+        return compiled_flops(update_fn, self, start, actions, targets, unroll=unroll)
 
     def checkpoint(self, filepath: str):
         """save dynamics model checkpoint"""
